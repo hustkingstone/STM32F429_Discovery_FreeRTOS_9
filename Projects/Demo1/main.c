@@ -28,7 +28,11 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "timers.h"
+#include "queue.h"
 
+uint32_t send_sum=0;		
+uint32_t received_sum=0;
+xQueueHandle xQueue;
 
 /** @addtogroup STM32F4_Discovery_Peripheral_Examples
   * @{
@@ -59,6 +63,41 @@ void ToggleLED2_Task(void*);
   * @param  None
   * @retval None
   */
+void vSenderTask(void*pvparameters)
+{uint32_t Valuetosend;
+uint32_t u1=1;
+for(;;)
+{vTaskDelay(2);
+for(u1=1;;u1++)
+  {Valuetosend=u1;
+   send_sum+=u1;
+xQueueSendToBack(xQueue,&Valuetosend,0);
+  if(u1==10000)  
+{u1=1;}
+}
+}
+}
+
+void vReceiverTask(void *pvParameters)
+{uint32_t ReceivedValue;
+for(;;)
+{vTaskDelay(1000);
+xQueueReceive(xQueue,&ReceivedValue,0);
+ received_sum+=ReceivedValue;
+}
+}
+
+void Monitor_Task()
+{for(;;)
+{vTaskDelay(10000);
+if(received_sum==send_sum)
+{ Green_LED_On();
+ Red_LED_Off();}
+else
+{Green_LED_Off();
+Red_LED_On();}
+}
+}
 int main(void)
 {
   /*!< At this stage the microcontroller clock setting is already configured, 
@@ -74,23 +113,13 @@ int main(void)
         vTraceEnable(TRC_START);
 
        /* Create tasks */
-       xTaskCreate(
-		  ToggleLED1_Task,                 /* Function pointer */
-		  "Task_LED1",                          /* Task name - for debugging only*/
-		  configMINIMAL_STACK_SIZE,         /* Stack depth in words */
-		  (void*) NULL,                     /* Pointer to tasks arguments (parameter) */
-		  tskIDLE_PRIORITY + 3UL,           /* Task priority*/
-		  NULL                              /* Task handle */
-       );
+xQueue=xQueueCreate(1000000,sizeof(uint32_t));
 
-       xTaskCreate(
-		  ToggleLED2_Task,                 /* Function pointer */
-		  "Task_LED2",                          /* Task name - for debugging only*/
-		  configMINIMAL_STACK_SIZE,         /* Stack depth in words */
-		  (void*) NULL,                     /* Pointer to tasks arguments (parameter) */
-		  tskIDLE_PRIORITY + 2UL,           /* Task priority*/
-		  NULL                              /* Task handle */
-       );
+ xTaskCreate(vSenderTask,"Sender",configMINIMAL_STACK_SIZE,NULL,3,NULL);
+  xTaskCreate(vReceiverTask,"Receiver",configMINIMAL_STACK_SIZE,NULL,2,NULL);
+  xTaskCreate(Monitor_Task,"Monitor",configMINIMAL_STACK_SIZE,NULL,1,NULL);
+ 
+
 
 	/* Start the scheduler. */
 	vTaskStartScheduler();
@@ -160,61 +189,25 @@ void Green_LED_Off(void)
 /**
  * ToggleLED1_Task: Toggle LED1 via RTOS Timer
  */
-void ToggleLED1_Task(void *pvParameters)
-{
-    int led = 0;  
 
-    while (1) 
-    {
-        if(led == 0)
-        {
-            Red_LED_On();
-            led = 1;
-        } 
-        else
-        {
-            Red_LED_Off();
-            led = 0;
-         }
         /*
         Delay for a period of time. vTaskDelay() places the task into
         the Blocked state until the period has expired.
         The delay period is spacified in 'ticks'. We can convert
         yhis in milisecond with the constant portTICK_RATE_MS.
         */
-        vTaskDelay(1000 / portTICK_RATE_MS);
-  }
-}
-
+        
 /**
  * ToggleLED2_Task: Toggle LED2 via RTOS Timer
  */
-void ToggleLED2_Task(void *pvParameters)
 
-{
-    int led = 0;  
-    while (1) 
-    {
-        if(led == 0)
-        {
-            Green_LED_On();
-            led = 1;
-        } 
-        else
-        {
-            Green_LED_Off();
-            led = 0;
-         }
         /*
         Delay for a period of time. vTaskDelay() places the task into
         the Blocked state until the period has expired.
         The delay period is spacified in 'ticks'. We can convert
         yhis in milisecond with the constant portTICK_RATE_MS.
         */
-        vTaskDelay(2000 / portTICK_RATE_MS);
-  }
-}
-
+        
 void vApplicationTickHook( void )
 {
 }
